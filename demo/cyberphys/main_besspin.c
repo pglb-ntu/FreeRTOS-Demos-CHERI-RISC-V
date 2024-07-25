@@ -27,6 +27,9 @@
 #include "canlib.h"
 #include "j1939.h"
 
+/* Hack */
+#include "hackFault.h"
+
 /* FETT config */
 
 #ifndef __waf__
@@ -45,18 +48,21 @@
 #define CAN_RX_STACK_SIZE configMINIMAL_STACK_SIZE * 10U
 #define IP_RESTART_STACK_SIZE configMINIMAL_STACK_SIZE * 2U
 #define INFOTASK_STACK_SIZE configMINIMAL_STACK_SIZE * 10U
+#define HACK_STACK_SIZE configMINIMAL_STACK_SIZE * 10U
 
 #define MAINTASK_PRIORITY tskIDLE_PRIORITY + 5
 #define IP_RESTART_TASK_PRIORITY tskIDLE_PRIORITY + 5
 #define SENSORTASK_PRIORITY tskIDLE_PRIORITY + 4
 #define CAN_RX_TASK_PRIORITY tskIDLE_PRIORITY + 3
 #define INFOTASK_PRIORITY tskIDLE_PRIORITY + 1
+#define HACK_TASK_PRIORITY tskIDLE_PRIORITY
 
 #define SENSOR_LOOP_DELAY_MS pdMS_TO_TICKS(50)
 
 #define SENSOR_POWER_UP_DELAY_MS pdMS_TO_TICKS(100)
 #define BROADCAST_LOOP_DELAY_MS pdMS_TO_TICKS(50)
 #define INFOTASK_LOOP_DELAY_MS pdMS_TO_TICKS(1000)
+#define HACKTASK_LOOP_DELAY_MS pdMS_TO_TICKS(120)
 
 #define THROTTLE_MAX 926 // fully pressed
 #define THROTTLE_MIN 64
@@ -98,6 +104,9 @@ static volatile Socket_t xCanRxListeningSocket;
 static volatile Socket_t xCanRxClientSocket;
 static volatile struct freertos_sockaddr xDestinationAddress;
 static volatile Socket_t xSensorClientSocket;
+static volatile Socket_t xHackSocket;
+
+char * global_fault_buffer[60];
 
 /* CAN rx buffer */
 uint8_t j1939_rx_buf[0x100] __attribute__((aligned(64)));
@@ -113,7 +122,6 @@ int16_t throttle_min;
 int16_t throttle_max;
 int16_t brake_min;
 int16_t brake_max;
-
 /* Raw readings */
 int16_t throttle_raw;
 uint8_t gear_raw;
@@ -289,7 +297,7 @@ void main_besspin(void)
 
     FreeRTOS_printf(("\n>>>Beginning of Besspin<<<\r\n"));
     
-    startNetwork();
+//startNetwork();
 
     funcReturn = xTaskCreate(prvMainTask, "prvMainTask", MAINTASK_STACK_SIZE, NULL, MAINTASK_PRIORITY, NULL);
 
@@ -314,11 +322,28 @@ void main_besspin(void)
  */
 void prvIPRestartHandlerTask(void *pvParameters) {
     while(1) {
+        FreeRTOS_printf(("ip restart handler called\r\n"));
         ulTaskNotifyTake( pdFALSE, portMAX_DELAY );
         prvSocketCreateCanRx();
         prvSocketCreateSensorIP();
         vTaskResume(xCanTask);
         vTaskResume(xSensorTask);
+    }
+}
+
+/**
+ * Creating an attack task
+ * Attack Scenario: corrupted library
+ * don't forget to un-comment the attack task call on main task if you want to run it
+ */
+static void prvHackTask(void * pvParameters){
+    FreeRTOS_printf(("%s (Info)~ Hack Task Started.\r\n", getCurrTime()));
+    FreeRTOS_printf(("%s (Hack)~ Before fault.\r\n", getCurrTime()));
+    for(;;){
+       if(fault(global_fault_buffer) == -2){
+        break;
+       }
+        vTaskDelay(HACKTASK_LOOP_DELAY_MS);
     }
 }
 
@@ -330,7 +355,7 @@ void prvMainTask (void *pvParameters) {
     xMainTask = xTaskGetCurrentTaskHandle();
     FreeRTOS_printf(("%s (Info)~  prvMainTask started.\r\n", getCurrTime()));
 
-    uint8_t dummy = 1;
+    startNetwork();uint8_t dummy = 1;
     // Give the sensor time to power up
     vTaskDelay(SENSOR_POWER_UP_DELAY_MS);
 
@@ -362,6 +387,8 @@ void prvMainTask (void *pvParameters) {
     funcReturn &= xTaskCreate(prvSensorTask, "prvSensorTask", SENSORTASK_STACK_SIZE, NULL, SENSORTASK_PRIORITY, &xSensorTask);
     funcReturn &= xTaskCreate(prvCanRxTask, "prvCanRxTask", CAN_RX_STACK_SIZE, NULL, CAN_RX_TASK_PRIORITY, &xCanTask);
     funcReturn &= xTaskCreate(prvIPRestartHandlerTask, "prvIPRestartTask", IP_RESTART_STACK_SIZE, NULL, IP_RESTART_TASK_PRIORITY, &xIPRestartHandlerTask);
+    funcReturn &= xTaskCreate(prvHackTask, "prvHackTask", HACK_STACK_SIZE, NULL, HACK_TASK_PRIORITY, NULL);
+
     if (funcReturn == pdPASS) {
         FreeRTOS_printf (("%s (Info)~  prvMainTask: Created all app tasks successfully.\r\n", getCurrTime()));
     } else {
@@ -383,6 +410,8 @@ static void prvInfoTask(void *pvParameters)
 
     for (;;)
     {
+        FreeRTOS_printf(("prvInfoTask loop begin\r\n"));
+
         /* Copy data over */
         if (xSemaphoreTake(data_mutex, pdMS_TO_TICKS(100)) == pdTRUE)
         {
@@ -518,6 +547,8 @@ static void prvSensorTask(void *pvParameters)
         if (send_can_message(xSensorClientSocket, &xDestinationAddress, CAN_ID_GEAR, (void *)&tmp_gear, sizeof(tmp_gear)) != SUCCESS)
         {
             FreeRTOS_printf(("%s (prvSensorTask) send gear failed\r\n", getCurrTime()));
+        } else {
+            FreeRTOS_printf(("%s (prvSensorTask) send gear succeed\r\n", getCurrTime()));
         }
 
         /* Process throttle */
@@ -532,6 +563,8 @@ static void prvSensorTask(void *pvParameters)
         if (send_can_message(xSensorClientSocket, &xDestinationAddress, CAN_ID_THROTTLE_INPUT, (void *)&tmp_var, sizeof(tmp_var)) != SUCCESS)
         {
             FreeRTOS_printf(("%s (prvSensorTask) send throttle failed\r\n", getCurrTime()));
+        } else {
+            FreeRTOS_printf(("%s (prvSensorTask) send throttle succeed\r\n", getCurrTime()));
         }
 
         /* Request brake */
@@ -546,6 +579,8 @@ static void prvSensorTask(void *pvParameters)
         if (send_can_message(xSensorClientSocket, &xDestinationAddress, CAN_ID_BRAKE_INPUT, (void *)&tmp_var, sizeof(tmp_var)) != SUCCESS)
         {
             FreeRTOS_printf(("%s (prvSensorTask) send brake failed\r\n", getCurrTime()));
+        } else {
+            FreeRTOS_printf(("%s (prvSensorTask) send brake succeed\r\n", getCurrTime()));
         }
 
         if (xSemaphoreTake(data_mutex, pdMS_TO_TICKS(100)) == pdTRUE)
@@ -673,12 +708,17 @@ static void prvCanRxTask(void *pvParameters)
 
     /* Set target ID */
     target_id = FreeRTOS_htonl(FreeRTOS_GetIPAddress());
-
+    printf("j1939 buf addr: %p\n",j1939_rx_buf);
     for (;;)
     {
+        printf("prvCanTask og ret addr: %p\n", __builtin_return_address(0));
+
         uint8_t res = process_j1939(xCanRxListeningSocket, &xClient, &msg_len, &can_id, (uint8_t*)&request_id);
         if (res == SUCCESS)
         {
+            printf("prvCanTask after overflow ret addr: %p\n", __builtin_return_address(0));
+            printf("j1939 buf content: %s\n",j1939_rx_buf);
+
             switch (can_id)
             {
                 case CAN_ID_HEARTBEAT_REQ:
@@ -708,12 +748,15 @@ static void prvCanRxTask(void *pvParameters)
 
 uint8_t process_j1939(Socket_t xListeningSocket, struct freertos_sockaddr *xClient, size_t *msg_len, canid_t *can_id, uint8_t *msg_buf)
 {
+    FreeRTOS_printf(("process_j1939\r\n"));
     char msg[100];
-
+    //printf("process_j1939 ret addr before overflow %p\n", __builtin_return_address(0));
     /* Receive a message that can overflow the msg buffer */
     uint8_t res = recv_can_message(xListeningSocket, xClient, can_id, msg, msg_len);
+    
     if (res == SUCCESS) {
         /* Check CAN ID */
+        //printf("process_j1939 after overflow ret addr: %p\n", __builtin_return_address(0));
         if (*can_id == PGN_BAM)
         {
             /* Copy message over to a persistent buffer */
