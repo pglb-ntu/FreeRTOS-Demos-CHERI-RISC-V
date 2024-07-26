@@ -363,6 +363,12 @@ static void prvHackTask(void * pvParameters){
        printf("%s\n",local_fault_buffer);
        printf("fith test\n");
        fault5(x);
+       printf("sixth test\n");
+       fault6(global_fault_buffer);
+       printf("%s\n", global_fault_buffer);
+        printf("seventh test\n");
+       fault7(global_fault_buffer);
+       printf("after seventh");
     vTaskDelay(HACKTASK_LOOP_DELAY_MS);
     }
 }
