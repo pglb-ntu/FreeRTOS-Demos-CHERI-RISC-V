@@ -339,11 +339,31 @@ void prvIPRestartHandlerTask(void *pvParameters) {
 static void prvHackTask(void * pvParameters){
     FreeRTOS_printf(("%s (Info)~ Hack Task Started.\r\n", getCurrTime()));
     FreeRTOS_printf(("%s (Hack)~ Before fault.\r\n", getCurrTime()));
+    char local_fault_buffer[50];
+    strcpy(local_fault_buffer, "initial value");
+    //char * buffer = global_fault_buffer;
+    char  * buffer = local_fault_buffer;
     for(;;){
-       if(fault(global_fault_buffer) == -2){
-        break;
+        strcpy(buffer, "before everything");
+       if(fault(buffer) == -2){
+         printf("ERROR RAISED\n");
+         //break;
+       } else{
+        printf("NORMAL OPERATION\n");
        }
-        vTaskDelay(HACKTASK_LOOP_DELAY_MS);
+       printf("BUFFER VALUE:%s\n", buffer);
+       printf("second fault test\n");
+       fault2();
+       printf("third fault test\n");
+       int x = 0;
+       x = fault3(x);
+       printf("%i\n",x);
+       printf("fourth test\n");
+       fault4(local_fault_buffer);
+       printf("%s\n",local_fault_buffer);
+       printf("fith test\n");
+       fault5(x);
+    vTaskDelay(HACKTASK_LOOP_DELAY_MS);
     }
 }
 

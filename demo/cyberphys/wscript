@@ -48,7 +48,8 @@ def configure(ctx):
         'BSP_USE_IIC0         = 0',
         'CAN_PORT             = 5002',
         'USE_CURRENT_TIME     = 1',
-        'configCHERI_COMPARTMENTALIZATION_FAULT_KILL = 1'
+        'configCHERI_COMPARTMENTALIZATION_FAULT_KILL = 1',
+        #'configCHERI_COMPARTMENTALIZATION_MODE = 1'
     ])
     #configCHERI_COMPARTMENTALIZATION_FAULT_KILL
 
