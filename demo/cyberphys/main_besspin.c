@@ -331,6 +331,9 @@ void prvIPRestartHandlerTask(void *pvParameters) {
     }
 }
 
+
+TickType_t BeginTime;
+TickType_t EndTime;
 /**
  * Creating an attack task
  * Attack Scenario: corrupted library
@@ -345,13 +348,29 @@ static void prvHackTask(void * pvParameters){
     char  * buffer = local_fault_buffer;
     for(;;){
         strcpy(buffer, "before everything");
+        BeginTime = xTaskGetTickCount();
        if(fault(buffer) == -2){
-         printf("ERROR RAISED\n");
-         //break;
-       } else{
+        EndTime = xTaskGetTickCount();
+        printf("ERROR RAISED\n");
+        //break;
+       } else {
+        EndTime = xTaskGetTickCount();
         printf("NORMAL OPERATION\n");
        }
-       printf("BUFFER VALUE:%s\n", buffer);
+
+        printf("BUFFER VALUE:%s\n", buffer);
+        TickType_t t = EndTime - BeginTime;
+        uint32_t n_seconds = t / configTICK_RATE_HZ;
+        uint32_t n_ms = t - n_seconds * configTICK_RATE_HZ;
+        n_ms = (n_ms * 1000) / configTICK_RATE_HZ;
+        uint32_t n_minutes = n_seconds / 60;
+        uint32_t n_hours = n_minutes / 60;
+
+        n_seconds = n_seconds - n_minutes * 60;
+        n_minutes = n_minutes - n_hours * 60;
+        printf("fault handle Measure: ms:%03u seconds:%02u minutes:%02u",n_ms, n_seconds, n_minutes);
+
+       /*
        printf("second fault test\n");
        fault2();
        printf("third fault test\n");
@@ -368,7 +387,14 @@ static void prvHackTask(void * pvParameters){
        printf("%s\n", global_fault_buffer);
         printf("seventh test\n");
        fault7(global_fault_buffer);
-       printf("after seventh");
+       printf("%s\n", global_fault_buffer);
+       printf("heigth test");
+       int count = fault8();
+       printf("%i\n", count);
+       printf("End of faulting tests\n");
+        */
+       printf("TEST FUNCT POINTER\n");
+        fault9(&vTaskSuspendAll);
     vTaskDelay(HACKTASK_LOOP_DELAY_MS);
     }
 }
