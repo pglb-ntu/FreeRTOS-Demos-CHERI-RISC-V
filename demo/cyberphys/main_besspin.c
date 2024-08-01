@@ -49,6 +49,7 @@
 #define IP_RESTART_STACK_SIZE configMINIMAL_STACK_SIZE * 2U
 #define INFOTASK_STACK_SIZE configMINIMAL_STACK_SIZE * 10U
 #define HACK_STACK_SIZE configMINIMAL_STACK_SIZE * 10U
+#define TEST_STACK_SIZE configMINIMAL_STACK_SIZE * 10U
 
 #define MAINTASK_PRIORITY tskIDLE_PRIORITY + 5
 #define IP_RESTART_TASK_PRIORITY tskIDLE_PRIORITY + 5
@@ -56,6 +57,7 @@
 #define CAN_RX_TASK_PRIORITY tskIDLE_PRIORITY + 3
 #define INFOTASK_PRIORITY tskIDLE_PRIORITY + 1
 #define HACK_TASK_PRIORITY tskIDLE_PRIORITY
+#define TEST_TASK_PRIORITY tskIDLE_PRIORITY+10
 
 #define SENSOR_LOOP_DELAY_MS pdMS_TO_TICKS(50)
 
@@ -63,6 +65,7 @@
 #define BROADCAST_LOOP_DELAY_MS pdMS_TO_TICKS(50)
 #define INFOTASK_LOOP_DELAY_MS pdMS_TO_TICKS(1000)
 #define HACKTASK_LOOP_DELAY_MS pdMS_TO_TICKS(120)
+#define TESTTASK_LOOP_DELAY_MS pdMS_TO_TICKS(50)
 
 #define THROTTLE_MAX 926 // fully pressed
 #define THROTTLE_MIN 64
@@ -332,6 +335,7 @@ void prvIPRestartHandlerTask(void *pvParameters) {
 }
 
 
+
 TickType_t BeginTime;
 TickType_t EndTime;
 /**
@@ -393,9 +397,32 @@ static void prvHackTask(void * pvParameters){
        printf("%i\n", count);
        printf("End of faulting tests\n");
         */
-       printf("TEST FUNCT POINTER\n");
-        fault9(&vTaskSuspendAll);
+    //    printf("TEST FUNCT POINTER\n");
+    //     fault9(&vTaskSuspendAll);
     vTaskDelay(HACKTASK_LOOP_DELAY_MS);
+    }
+}
+
+
+void prvTestTask(void * pvParameters){
+    TickType_t BeginTestTime;
+    TickType_t EndTestTime;
+    for(;;){
+    BeginTime = xTaskGetTickCount();
+    for(int i=0;i<1000000;i++){
+        test();
+    }
+    EndTime = xTaskGetTickCount();
+    TickType_t t = EndTime - BeginTime;
+    uint32_t n_seconds = t / configTICK_RATE_HZ;
+    uint32_t n_ms = t - n_seconds * configTICK_RATE_HZ;
+    n_ms = (n_ms * 1000) / configTICK_RATE_HZ;
+    uint32_t n_minutes = n_seconds / 60;
+    uint32_t n_hours = n_minutes / 60;
+    n_seconds = n_seconds - n_minutes * 60;
+    n_minutes = n_minutes - n_hours * 60;
+    printf("test time: ms:%03u seconds:%02u minutes:%02u",n_ms, n_seconds, n_minutes);
+    vTaskDelay(TESTTASK_LOOP_DELAY_MS);
     }
 }
 
@@ -439,7 +466,8 @@ void prvMainTask (void *pvParameters) {
     funcReturn &= xTaskCreate(prvSensorTask, "prvSensorTask", SENSORTASK_STACK_SIZE, NULL, SENSORTASK_PRIORITY, &xSensorTask);
     funcReturn &= xTaskCreate(prvCanRxTask, "prvCanRxTask", CAN_RX_STACK_SIZE, NULL, CAN_RX_TASK_PRIORITY, &xCanTask);
     funcReturn &= xTaskCreate(prvIPRestartHandlerTask, "prvIPRestartTask", IP_RESTART_STACK_SIZE, NULL, IP_RESTART_TASK_PRIORITY, &xIPRestartHandlerTask);
-    funcReturn &= xTaskCreate(prvHackTask, "prvHackTask", HACK_STACK_SIZE, NULL, HACK_TASK_PRIORITY, NULL);
+    //funcReturn &= xTaskCreate(prvHackTask, "prvHackTask", HACK_STACK_SIZE, NULL, HACK_TASK_PRIORITY, NULL);
+    //funcReturn &= xTaskCreate(prvTestTask, "prvTestTask", TEST_STACK_SIZE, NULL, TEST_TASK_PRIORITY, NULL);
 
     if (funcReturn == pdPASS) {
         FreeRTOS_printf (("%s (Info)~  prvMainTask: Created all app tasks successfully.\r\n", getCurrTime()));
