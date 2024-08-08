@@ -12,8 +12,13 @@
 #include "FreeRTOS_IP.h"
 #include "FreeRTOS_Sockets.h"
 
+
+
 /* Drivers */
 #include "bsp.h"
+
+/* RTL */
+#include "rtl/rtl-freertos-compartments.h"
 
 #if BSP_USE_IIC0
     #include "iic.h"
@@ -50,6 +55,7 @@
 #define INFOTASK_STACK_SIZE configMINIMAL_STACK_SIZE * 10U
 #define HACK_STACK_SIZE configMINIMAL_STACK_SIZE * 10U
 #define TEST_STACK_SIZE configMINIMAL_STACK_SIZE * 10U
+#define WATCH_STACK_SIZE configMINIMAL_STACK_SIZE * 10U
 
 #define MAINTASK_PRIORITY tskIDLE_PRIORITY + 5
 #define IP_RESTART_TASK_PRIORITY tskIDLE_PRIORITY + 5
@@ -57,6 +63,7 @@
 #define CAN_RX_TASK_PRIORITY tskIDLE_PRIORITY + 3
 #define INFOTASK_PRIORITY tskIDLE_PRIORITY + 1
 #define HACK_TASK_PRIORITY tskIDLE_PRIORITY
+#define WATCH_TASK_PRIORITY tskIDLE_PRIORITY +3
 #define TEST_TASK_PRIORITY tskIDLE_PRIORITY+10
 
 #define SENSOR_LOOP_DELAY_MS pdMS_TO_TICKS(50)
@@ -65,7 +72,8 @@
 #define BROADCAST_LOOP_DELAY_MS pdMS_TO_TICKS(50)
 #define INFOTASK_LOOP_DELAY_MS pdMS_TO_TICKS(1000)
 #define HACKTASK_LOOP_DELAY_MS pdMS_TO_TICKS(120)
-#define TESTTASK_LOOP_DELAY_MS pdMS_TO_TICKS(50)
+#define TESTTASK_LOOP_DELAY_MS pdMS_TO_TICKS(200)
+#define WATCHTASK_LOOP_DELAY_MS pdMS_TO_TICKS(10000)
 
 #define THROTTLE_MAX 926 // fully pressed
 #define THROTTLE_MIN 64
@@ -148,6 +156,9 @@ static const uint8_t ucNetMask[4] = {configNET_MASK0, configNET_MASK1, configNET
 static const uint8_t ucGatewayAddress[4] = {configGATEWAY_ADDR0, configGATEWAY_ADDR1, configGATEWAY_ADDR2, configGATEWAY_ADDR3};
 static const uint8_t ucDNSServerAddress[4] = {configDNS_SERVER_ADDR0, configDNS_SERVER_ADDR1, configDNS_SERVER_ADDR2, configDNS_SERVER_ADDR3};
 const uint8_t ucMACAddress[6] = {configMAC_ADDR0, configMAC_ADDR1, configMAC_ADDR2, configMAC_ADDR3, configMAC_ADDR4, configMAC_ADDR5};
+
+extern Compartment_t comp_list[configCOMPARTMENTS_NUM];
+
 
 /* Auxilliary function */
 int16_t min(int16_t a, int16_t b)
@@ -432,6 +443,37 @@ void prvTestTask(void * pvParameters){
     }
 }
 
+
+void prvWatchTask(void * pvParameters){
+    TickType_t currentTick;
+    TickType_t compartmentTick;
+    TickType_t t;
+    int count;
+    for(;;){
+
+        for(int comp_id = 0 ; comp_id < configCOMPARTMENTS_NUM; comp_id++){
+           count = comp_list[comp_id].counter;
+           currentTick = xTaskGetTickCount();
+           compartmentTick = comp_list[comp_id].last_tick;
+           t = currentTick - compartmentTick;
+           uint32_t n_seconds = t / configTICK_RATE_HZ;
+           uint32_t n_ms = t - n_seconds * configTICK_RATE_HZ;
+           n_ms = (n_ms * 1000) / configTICK_RATE_HZ;
+           uint32_t n_minutes = n_seconds / 60;
+           uint32_t n_hours = n_minutes / 60;
+           n_seconds = n_seconds - n_minutes * 60;
+           if((count / n_seconds) > 50){
+            printf("compartment %i is called (%i times) more than 50 times per seconds\n",comp_id,count);
+           } else {
+            printf("compartment %i is called less than 50 times per seconds\n",comp_id);
+           }
+           comp_list[comp_id].counter = 0;
+           comp_list[comp_id].last_tick = currentTick;
+        }
+        vTaskDelay(WATCHTASK_LOOP_DELAY_MS);
+    }
+}
+
 void prvMainTask (void *pvParameters) {
     (void) pvParameters;
     BaseType_t funcReturn;
@@ -472,8 +514,9 @@ void prvMainTask (void *pvParameters) {
     funcReturn &= xTaskCreate(prvSensorTask, "prvSensorTask", SENSORTASK_STACK_SIZE, NULL, SENSORTASK_PRIORITY, &xSensorTask);
     funcReturn &= xTaskCreate(prvCanRxTask, "prvCanRxTask", CAN_RX_STACK_SIZE, NULL, CAN_RX_TASK_PRIORITY, &xCanTask);
     funcReturn &= xTaskCreate(prvIPRestartHandlerTask, "prvIPRestartTask", IP_RESTART_STACK_SIZE, NULL, IP_RESTART_TASK_PRIORITY, &xIPRestartHandlerTask);
-    funcReturn &= xTaskCreate(prvHackTask, "prvHackTask", HACK_STACK_SIZE, NULL, HACK_TASK_PRIORITY, NULL);
+    //funcReturn &= xTaskCreate(prvHackTask, "prvHackTask", HACK_STACK_SIZE, NULL, HACK_TASK_PRIORITY, NULL);
     //funcReturn &= xTaskCreate(prvTestTask, "prvTestTask", TEST_STACK_SIZE, NULL, TEST_TASK_PRIORITY, NULL);
+    //funcReturn &= xTaskCreate(prvWatchTask, "prvWatchTask", WATCH_STACK_SIZE, NULL, WATCH_TASK_PRIORITY, NULL);
 
     if (funcReturn == pdPASS) {
         FreeRTOS_printf (("%s (Info)~  prvMainTask: Created all app tasks successfully.\r\n", getCurrTime()));
