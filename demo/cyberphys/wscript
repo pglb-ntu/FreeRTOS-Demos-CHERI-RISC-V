@@ -37,7 +37,6 @@ def configure(ctx):
         'INCLUDES',
         [
             ctx.path.abspath() + "/cyberphys",
-            ctx.path.abspath()+"../../../../../FreeRTOS-Labs/FreeRTOS-Labs/Source/FreeRTOS-libdl/include/"
         ])
 
     ctx.env.append_value('DEFINES', [
@@ -110,7 +109,7 @@ def build(bld):
         source=[
             'cyberphys/hackFault.c',
         ],
-        use=["freertos_bsp_headers"],
+        use=["freertos_bsp_headers", "freertos_core_headers", "freertos_libdl"],
         target='hackFault')
 
     bld.stlib(

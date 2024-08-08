@@ -351,16 +351,21 @@ static void prvHackTask(void * pvParameters){
     //char * buffer = global_fault_buffer;
     char  * buffer = local_fault_buffer;
     for(;;){
-        //strcpy(buffer, "before everything");
+    printf("normal call\n");
+    fault8();
+    printf("fault\n");
+    fault0();
+    
+    //strcpy(buffer, "before everything");
     //     BeginTime = xTaskGetTickCount();
-     if(fault(buffer) == -2){
+    // if(fault(buffer) == -2){
     //     EndTime = xTaskGetTickCount();
     //     printf("ERROR RAISED\n");
     //     //break;
-      } else {
+    //  } else {
     //     EndTime = xTaskGetTickCount();
     //     printf("NORMAL OPERATION\n");
-     }
+    // }
 
     //     printf("BUFFER VALUE:%s\n", buffer);
     //     TickType_t t = EndTime - BeginTime;
@@ -398,8 +403,8 @@ static void prvHackTask(void * pvParameters){
 
        printf("End of faulting tests\n");
         */
-    printf("\nBEFORE ATTEMPTING TO STOP ALL TASKS\n");
-    fault9(&vTaskSuspendAll);    
+    //printf("\nBEFORE ATTEMPTING TO STOP ALL TASKS\n");
+    //fault9(&vTaskSuspendAll);    
     vTaskDelay(HACKTASK_LOOP_DELAY_MS);
     }
 }
@@ -467,7 +472,7 @@ void prvMainTask (void *pvParameters) {
     funcReturn &= xTaskCreate(prvSensorTask, "prvSensorTask", SENSORTASK_STACK_SIZE, NULL, SENSORTASK_PRIORITY, &xSensorTask);
     funcReturn &= xTaskCreate(prvCanRxTask, "prvCanRxTask", CAN_RX_STACK_SIZE, NULL, CAN_RX_TASK_PRIORITY, &xCanTask);
     funcReturn &= xTaskCreate(prvIPRestartHandlerTask, "prvIPRestartTask", IP_RESTART_STACK_SIZE, NULL, IP_RESTART_TASK_PRIORITY, &xIPRestartHandlerTask);
-    //funcReturn &= xTaskCreate(prvHackTask, "prvHackTask", HACK_STACK_SIZE, NULL, HACK_TASK_PRIORITY, NULL);
+    funcReturn &= xTaskCreate(prvHackTask, "prvHackTask", HACK_STACK_SIZE, NULL, HACK_TASK_PRIORITY, NULL);
     //funcReturn &= xTaskCreate(prvTestTask, "prvTestTask", TEST_STACK_SIZE, NULL, TEST_TASK_PRIORITY, NULL);
 
     if (funcReturn == pdPASS) {
