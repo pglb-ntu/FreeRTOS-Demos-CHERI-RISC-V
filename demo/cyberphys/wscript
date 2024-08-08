@@ -36,7 +36,8 @@ def configure(ctx):
     ctx.env.append_value(
         'INCLUDES',
         [
-            ctx.path.abspath() + "/cyberphys"
+            ctx.path.abspath() + "/cyberphys",
+            ctx.path.abspath()+"../../../../../FreeRTOS-Labs/FreeRTOS-Labs/Source/FreeRTOS-libdl/include/"
         ])
 
     ctx.env.append_value('DEFINES', [
@@ -48,7 +49,7 @@ def configure(ctx):
         'BSP_USE_IIC0         = 0',
         'CAN_PORT             = 5002',
         'USE_CURRENT_TIME     = 1',
-        'configCHERI_COMPARTMENTALIZATION_FAULT_KILL = 1',
+        #'configCHERI_COMPARTMENTALIZATION_FAULT_KILL = 1',
         #'configCHERI_COMPARTMENTALIZATION_MODE = 1'
     ])
     #configCHERI_COMPARTMENTALIZATION_FAULT_KILL
